@@ -7,6 +7,12 @@
 import { useEffect, useState } from 'react';
 import { getJobStatus, getJobResults } from '../api';
 
+// Safety net: stop polling if the backend never reaches a terminal state
+// (e.g. it became unreachable). Generously longer than the server-side
+// PROCESSING_TIMEOUT_SECONDS so a real timeout surfaces as a "failed" status
+// first, with its specific error message.
+const MAX_WAIT_MS = 180_000;
+
 const STATUS_ICON = {
   processing: '⚙️',
   done:       '✅',
@@ -40,6 +46,7 @@ export default function ProcessingStep({ jobId, onComplete }) {
     if (!jobId) return;
 
     let cancelled = false;
+    const startedAt = Date.now();
 
     async function poll() {
       while (!cancelled) {
@@ -59,6 +66,11 @@ export default function ProcessingStep({ jobId, onComplete }) {
           }
         } catch (e) {
           if (!cancelled) setError(e.message);
+          return;
+        }
+
+        if (Date.now() - startedAt > MAX_WAIT_MS) {
+          if (!cancelled) setError('Screening timed out — the server stopped responding. Please try again.');
           return;
         }
 

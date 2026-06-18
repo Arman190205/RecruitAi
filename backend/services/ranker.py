@@ -38,6 +38,34 @@ async def run_scoring_pipeline(
     files: list[tuple[str, bytes]],  # (filename, raw_bytes)
 ) -> None:
     """
+    Background pipeline with a hard wall-clock budget.
+
+    Delegates to :func:`_scoring_pipeline_impl` under ``asyncio.wait_for`` so a
+    stalled LLM call (or any other hang) can't leave a job stuck "processing"
+    forever — it is cancelled and marked "failed" once the budget is exceeded.
+    Set ``processing_timeout_seconds`` to 0 to disable the timeout.
+    """
+    timeout = settings.processing_timeout_seconds
+    timeout = timeout if timeout and timeout > 0 else None
+    try:
+        await asyncio.wait_for(_scoring_pipeline_impl(job_id, files), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.error("[Job %s] Pipeline timed out after %ss — marking failed",
+                     job_id, timeout)
+        store.update_status(
+            job_id, status="failed",
+            error=f"Processing timed out after {timeout}s. Try fewer or smaller files.",
+        )
+    except Exception as exc:  # noqa: BLE001 — last-resort guard for a background task
+        logger.exception("[Job %s] Pipeline crashed: %s", job_id, exc)
+        store.update_status(job_id, status="failed", error=str(exc))
+
+
+async def _scoring_pipeline_impl(
+    job_id: str,
+    files: list[tuple[str, bytes]],  # (filename, raw_bytes)
+) -> None:
+    """
     Background pipeline: parse CVs → score → rank → store results.
 
     Args:
