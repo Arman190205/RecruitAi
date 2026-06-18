@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     top_n_candidates: int = 10
     processing_timeout_seconds: int = 120
 
+    # How long a job's state (status, results, parsed CVs) is retained in the
+    # in-memory store after its last activity, before being evicted. Prevents
+    # unbounded memory growth on long-running servers. Default: 1 hour.
+    job_retention_seconds: int = 3600
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

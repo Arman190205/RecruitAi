@@ -166,6 +166,7 @@ All settings are in `backend/.env` (copied from `.env.example`):
 | `MAX_CVS_PER_BATCH` | `50` | Max CVs per upload |
 | `TOP_N_CANDIDATES` | `10` | Candidates shown in results |
 | `PROCESSING_TIMEOUT_SECONDS` | `120` | Pipeline timeout |
+| `JOB_RETENTION_SECONDS` | `3600` | How long job state is kept in memory after last activity before eviction (0 disables) |
 
 ---
 
