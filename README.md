@@ -13,6 +13,7 @@ RecruitAI is a full-stack web application that uses LLMs to **semantically scree
 | **JD Parser** | Paste any job posting → AI extracts hard skills, soft skills, must-haves, nice-to-haves, experience level, and domain knowledge |
 | **Batch CV Upload** | Drag-and-drop up to 50 PDF or DOCX résumés at once |
 | **Semantic Scoring** | Each candidate scored across 5 weighted dimensions (Hard Skills 35%, Must-Have 30%, Experience 15%, Soft Skills 10%, Domain 10%) |
+| **Adjustable Weights** | Re-weight the 5 scoring dimensions from the results view and the shortlist re-ranks instantly in the browser — no re-scoring round trip |
 | **Explainable Rankings** | Per-candidate AI justification: why they fit, what gaps exist |
 | **Bias & Diversity Flags** | Detects homogeneous shortlists; surfaces "Hidden Gem" candidates with strong technical fundamentals |
 | **Interview Questions** | 3 tailored, gap-probing interview questions auto-generated per candidate |

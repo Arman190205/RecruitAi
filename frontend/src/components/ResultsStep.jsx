@@ -5,6 +5,12 @@
 
 import { useState, useMemo } from 'react';
 import CandidateCard from './CandidateCard';
+import {
+  WEIGHT_DIMS,
+  DEFAULT_WEIGHTS,
+  isDefaultWeights,
+  rerankByWeights,
+} from '../scoreWeights';
 
 /** Small pill/tag chip */
 function Chip({ label, variant = 'default' }) {
@@ -154,6 +160,84 @@ function BiasReportPanel({ biasReport, candidates }) {
   );
 }
 
+function WeightsPanel({ weights, onChange, onReset }) {
+  const [open, setOpen] = useState(false);
+  const isCustom = !isDefaultWeights(weights);
+  const sum = WEIGHT_DIMS.reduce((s, d) => s + (weights[d.key] || 0), 0);
+
+  return (
+    <div style={{
+      background: isCustom
+        ? 'linear-gradient(135deg, rgba(245,158,11,0.07), rgba(217,119,6,0.04))'
+        : 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.03))',
+      border: `1px solid ${isCustom ? 'rgba(245,158,11,0.3)' : 'rgba(99,102,241,0.2)'}`,
+      borderRadius: 'var(--radius-lg)', marginBottom: 20, overflow: 'hidden',
+    }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+        padding: '16px 22px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+      }} aria-expanded={open}>
+        <div aria-hidden="true" style={{
+          width: 40, height: 40, borderRadius: 10,
+          background: isCustom ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '1.1rem', flexShrink: 0,
+        }}>⚖️</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+            Scoring Weights
+            {isCustom && (
+              <span style={{ marginLeft: 10, fontSize: '0.7rem', fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#fcd34d' }}>
+                Custom · re-ranked locally
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
+            Tune how each dimension counts — the shortlist re-ranks instantly
+          </div>
+        </div>
+        <div aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: '1rem', transition: 'transform 0.25s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}>▾</div>
+      </button>
+      {open && (
+        <div style={{ padding: '4px 22px 20px', borderTop: `1px solid ${isCustom ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)'}` }}>
+          {WEIGHT_DIMS.map(d => {
+            const raw = weights[d.key] || 0;
+            const share = sum > 0 ? Math.round((raw / sum) * 100) : 0;
+            return (
+              <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '12px 0' }}>
+                <label htmlFor={`weight-${d.key}`} style={{ width: 130, fontSize: '0.82rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                  {d.label}
+                </label>
+                <input
+                  id={`weight-${d.key}`}
+                  type="range" min="0" max="100" step="1" value={raw}
+                  onChange={e => onChange(d.key, Number(e.target.value))}
+                  style={{ flex: 1, accentColor: 'var(--accent-1)', cursor: 'pointer' }}
+                  aria-label={`${d.label} weight, ${share}% of total`}
+                />
+                <span style={{ width: 44, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: '0.82rem', color: 'var(--accent-1)' }}>
+                  {share}%
+                </span>
+              </div>
+            );
+          })}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              Shares are normalised to 100%. Re-ranking uses each candidate&apos;s existing dimension scores.
+            </span>
+            <button onClick={onReset} disabled={!isCustom} style={{
+              padding: '6px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: 600,
+              border: '1px solid var(--border)', background: 'var(--bg-glass)',
+              color: isCustom ? 'var(--text-secondary)' : 'var(--text-muted)',
+              cursor: isCustom ? 'pointer' : 'not-allowed', opacity: isCustom ? 1 : 0.5,
+            }}>↺ Reset to defaults</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function exportCSV(candidates, jdTitle) {
   const headers = ['Rank', 'Name', 'File', 'Email', 'Phone', 'Total Score', 'Hard Skills', 'Must Have', 'Experience Fit', 'Soft Skills', 'Domain Knowledge', 'Gaps', 'Explanation'];
   const rows = candidates.map(c => {
@@ -176,10 +260,20 @@ export default function ResultsStep({ results, onRestart }) {
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('rank');
   const [toast, setToast] = useState(false);
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
 
-  const candidates = results?.ranked_candidates ?? [];
   const jd = results?.jd;
   const biasReport = results?.bias_report ?? null;
+  const serverCandidates = useMemo(() => results?.ranked_candidates ?? [], [results]);
+
+  // When weights are the backend defaults, keep the server's authoritative
+  // ranking; otherwise re-rank locally from each candidate's dimension scores.
+  const candidates = useMemo(
+    () => (isDefaultWeights(weights)
+      ? serverCandidates
+      : rerankByWeights(serverCandidates, weights)),
+    [serverCandidates, weights],
+  );
 
   const filtered = useMemo(() => {
     let list = [...candidates];
@@ -201,6 +295,9 @@ export default function ResultsStep({ results, onRestart }) {
     setToast(true);
     setTimeout(() => setToast(false), 2500);
   }
+
+  const updateWeight = (key, value) => setWeights(w => ({ ...w, [key]: value }));
+  const resetWeights = () => setWeights(DEFAULT_WEIGHTS);
 
   const strongFilterCount = candidates.filter(c => c.score_breakdown.total >= 70).length;
   const midFilterCount = candidates.filter(c => c.score_breakdown.total >= 40 && c.score_breakdown.total < 70).length;
@@ -232,6 +329,9 @@ export default function ResultsStep({ results, onRestart }) {
 
       <RoleDetailsPanel jd={jd} />
       <BiasReportPanel biasReport={biasReport} candidates={candidates} />
+      {candidates.length > 0 && (
+        <WeightsPanel weights={weights} onChange={updateWeight} onReset={resetWeights} />
+      )}
 
       <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
         {[
