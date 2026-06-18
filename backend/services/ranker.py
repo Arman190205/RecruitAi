@@ -21,6 +21,7 @@ Individual CV parse errors are captured and do not abort the batch.
 import asyncio
 import logging
 import time
+from core.config import settings
 from models.cv_models import CVUploadStatus
 from models.result_models import JobResult, CandidateResult
 from services.cv_extractor import extract_text
@@ -142,6 +143,7 @@ async def run_scoring_pipeline(
     ranked = sorted(candidate_results,
                     key=lambda r: r.score_breakdown.total,
                     reverse=True)
+    ranked = ranked[:settings.top_n_candidates]
     for i, candidate in enumerate(ranked, start=1):
         candidate.rank = i
 
