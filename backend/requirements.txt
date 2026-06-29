@@ -22,5 +22,12 @@ python-multipart==0.0.12
 # Async HTTP (optional, for future use)
 httpx==0.27.2
 
+# Optional: enables TRUE semantic skill matching via embeddings in skill_matcher.py.
+# Heavy (~400 MB with torch). If absent, the matcher automatically falls back to
+# deterministic fuzzy matching (synonyms + token overlap) — no code change needed.
+# NOTE: Render's free tier (512 MB RAM) may OOM with this installed; enable on a
+# paid tier or run locally for the embeddings demo.
+# sentence-transformers==3.3.1
+
 # Testing
 pytest==8.3.3
