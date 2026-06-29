@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { scoreColor } from '../scoreBands';
 
 const SCORE_DIMS = [
   { key: 'hard_skills', label: 'Hard Skills', weight: '35%' },
@@ -12,13 +13,6 @@ const SCORE_DIMS = [
   { key: 'soft_skills', label: 'Soft Skills', weight: '10%' },
   { key: 'domain_knowledge', label: 'Domain Knowledge', weight: '10%' },
 ];
-
-function scoreColor(val) {
-  if (val >= 75) return 'var(--score-great)';
-  if (val >= 55) return 'var(--score-good)';
-  if (val >= 35) return 'var(--score-mid)';
-  return 'var(--score-low)';
-}
 
 function rankBadgeClass(rank) {
   if (rank === 1) return 'r1';

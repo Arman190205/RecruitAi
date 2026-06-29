@@ -11,6 +11,7 @@ import {
   isDefaultWeights,
   rerankByWeights,
 } from '../scoreWeights';
+import { SCORE_BANDS, scoreBand } from '../scoreBands';
 
 /** Small pill/tag chip */
 function Chip({ label, variant = 'default' }) {
@@ -277,17 +278,23 @@ export default function ResultsStep({ results, onRestart }) {
 
   const filtered = useMemo(() => {
     let list = [...candidates];
-    if (filter === 'strong') list = list.filter(c => c.score_breakdown.total >= 70);
-    if (filter === 'mid')    list = list.filter(c => c.score_breakdown.total >= 40 && c.score_breakdown.total < 70);
-    if (filter === 'weak')   list = list.filter(c => c.score_breakdown.total < 40);
+    const band = SCORE_BANDS.find(b => b.key === filter);
+    if (band) list = list.filter(c => band.test(c.score_breakdown.total));
     if (sortBy === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
     else list.sort((a, b) => a.rank - b.rank);
     return list;
   }, [candidates, filter, sortBy]);
 
+  // Count candidates in each band once (shared by the filter buttons).
+  const bandCounts = useMemo(() => {
+    const counts = Object.fromEntries(SCORE_BANDS.map(b => [b.key, 0]));
+    for (const c of candidates) counts[scoreBand(c.score_breakdown.total).key]++;
+    return counts;
+  }, [candidates]);
+
   const topScore = candidates[0]?.score_breakdown.total ?? 0;
   const avgScore = candidates.length ? Math.round(candidates.reduce((s, c) => s + c.score_breakdown.total, 0) / candidates.length) : 0;
-  const strongCount = candidates.filter(c => c.score_breakdown.total >= 70).length;
+  const strongCount = bandCounts.great ?? 0;
   const processingTime = results?.processing_time_seconds ? `${results.processing_time_seconds.toFixed(1)}s` : '—';
 
   function handleExport() {
@@ -298,10 +305,6 @@ export default function ResultsStep({ results, onRestart }) {
 
   const updateWeight = (key, value) => setWeights(w => ({ ...w, [key]: value }));
   const resetWeights = () => setWeights(DEFAULT_WEIGHTS);
-
-  const strongFilterCount = candidates.filter(c => c.score_breakdown.total >= 70).length;
-  const midFilterCount = candidates.filter(c => c.score_breakdown.total >= 40 && c.score_breakdown.total < 70).length;
-  const weakFilterCount = candidates.filter(c => c.score_breakdown.total < 40).length;
 
   return (
     <div>
@@ -352,9 +355,7 @@ export default function ResultsStep({ results, onRestart }) {
         <div className="flex-row gap-8" style={{ flexWrap: 'wrap' }}>
           {[
             { key: 'all', label: 'All', count: candidates.length },
-            { key: 'strong', label: 'Strong ≥70', count: strongFilterCount },
-            { key: 'mid', label: 'Mid 40–69', count: midFilterCount },
-            { key: 'weak', label: 'Weak <40', count: weakFilterCount },
+            ...SCORE_BANDS.map(b => ({ key: b.key, label: `${b.label} ${b.range}`, count: bandCounts[b.key] })),
           ].map(f => (
             <button key={f.key} id={`filter-${f.key}-btn`} className="filter-btn" onClick={() => setFilter(f.key)} style={{
               padding: '5px 14px', borderRadius: '20px',
@@ -380,10 +381,10 @@ export default function ResultsStep({ results, onRestart }) {
       </div>
 
       <div className="flex-row gap-16" style={{ marginBottom: 20, flexWrap: 'wrap' }}>
-        {[{ color: 'var(--score-great)', label: 'Strong ≥75' }, { color: 'var(--score-good)', label: 'Good 55–74' }, { color: 'var(--score-mid)', label: 'Average 35–54' }, { color: 'var(--score-low)', label: 'Weak <35' }].map(l => (
-          <div key={l.label} className="flex-row gap-8">
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: l.color, flexShrink: 0 }} />
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{l.label}</span>
+        {SCORE_BANDS.map(b => (
+          <div key={b.key} className="flex-row gap-8">
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{b.label} {b.range}</span>
           </div>
         ))}
       </div>
