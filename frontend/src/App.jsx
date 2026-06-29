@@ -22,7 +22,6 @@ function getInitialTheme() {
 export default function App() {
   const [step, setStep]         = useState(1);   // 1 | 2 | 3 | 4
   const [parsedJD, setParsedJD]   = useState(null);
-  const [rawJdText, setRawJdText] = useState('');
   const [jobId, setJobId]         = useState(null);
   const [results, setResults]     = useState(null);
   const [theme, setTheme]         = useState(getInitialTheme);
@@ -38,9 +37,8 @@ export default function App() {
   }
 
   // Step 1 → 2
-  function handleJDParsed(jd, rawText) {
+  function handleJDParsed(jd) {
     setParsedJD(jd);
-    setRawJdText(rawText || '');
     setStep(2);
   }
 
@@ -59,7 +57,6 @@ export default function App() {
   // Reset to step 1
   function handleRestart() {
     setParsedJD(null);
-    setRawJdText('');
     setJobId(null);
     setResults(null);
     setStep(1);
