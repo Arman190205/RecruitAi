@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     # Groq
     groq_api_key: str
     groq_model: str = "llama-3.3-70b-versatile"
+    # Transient-failure retry policy for Groq calls (rate limits, 5xx, timeouts).
+    groq_max_retries: int = 3
+    groq_retry_base_delay: float = 1.0  # seconds; doubled each attempt
 
     # Processing limits
     max_cvs_per_batch: int = 50
